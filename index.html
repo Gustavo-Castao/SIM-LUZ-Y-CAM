@@ -2,44 +2,54 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Estudio de Fotografía: Teoría y Práctica</title>
+    <title>Estudio de Fotografía: Simulador Monocromo</title>
     <style>
-        body { margin: 0; background: #000; color: #fff; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+        body { margin: 0; background: #000; color: #fff; font-family: 'Inter', sans-serif; overflow: hidden; }
         canvas { display: block; }
 
-        /* UI Minimalista Azul/Negro */
+        /* UI Monocromática (Blanco, Gris, Negro) */
         #gui-container { 
             position: absolute; top: 0; left: 0; width: 280px; height: 100%; 
-            background: rgba(0, 10, 20, 0.85); backdrop-filter: blur(10px);
-            border-right: 1px solid #0055ff; padding: 20px; box-sizing: border-box;
-            transition: transform 0.3s; overflow-y: auto;
+            background: rgba(10, 10, 10, 0.95); backdrop-filter: blur(10px);
+            border-right: 1px solid #333; padding: 20px; box-sizing: border-box;
+            transition: transform 0.3s; overflow-y: auto; z-index: 10;
         }
         #gui-container.collapsed { transform: translateX(-100%); }
         
-        .section { margin-bottom: 25px; border-bottom: 1px solid #003366; padding-bottom: 10px; }
-        h3 { color: #0088ff; font-size: 0.8rem; text-transform: uppercase; margin: 0 0 10px 0; letter-spacing: 1px; }
+        .section { margin-bottom: 25px; border-bottom: 1px solid #222; padding-bottom: 10px; }
+        h3 { color: #fff; font-size: 0.8rem; text-transform: uppercase; margin: 0 0 10px 0; letter-spacing: 1px; font-weight: 600;}
         
-        /* Tooltip de Teoría */
+        /* Tooltip de Teoría (Gris Claro) */
         .theory-box { 
-            background: rgba(0, 85, 255, 0.1); border-left: 3px solid #0088ff;
-            padding: 8px; font-size: 0.75rem; margin-top: 5px; color: #add8e6; line-height: 1.3;
+            background: rgba(255, 255, 255, 0.05); border-left: 3px solid #666;
+            padding: 10px; font-size: 0.75rem; margin-top: 5px; color: #ccc; line-height: 1.4;
         }
 
+        /* Botones (Gris Oscuro a Blanco) */
         button { 
-            width: 100%; background: #111; border: 1px solid #333; color: #ccc; 
+            width: 100%; background: #1a1a1a; border: 1px solid #333; color: #bbb; 
             padding: 10px; text-align: left; cursor: pointer; font-size: 0.8rem; margin-bottom: 5px;
+            transition: all 0.2s ease;
         }
-        button:hover { background: #002244; border-color: #0088ff; color: #fff; }
+        button:hover { background: #fff; border-color: #fff; color: #000; }
+        button.active { background: #666; color: #fff; border-color: #666; }
         
-        .control-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 0.8rem; }
-        input[type=range] { flex-grow: 1; accent-color: #0088ff; }
-        input[type=color] { border: none; width: 30px; height: 30px; background: none; cursor: pointer; }
+        /* Controles Manuales */
+        .control-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 0.8rem; color: #bbb;}
+        input[type=range] { flex-grow: 1; accent-color: #fff; background: #333;}
+        input[type=color] { border: 1px solid #333; width: 30px; height: 30px; background: none; cursor: pointer; padding: 0;}
 
+        /* Botón de Despliegue (Negro/Blanco) */
         #btn-toggle { 
-            position: absolute; top: 10px; left: 290px; background: #0055ff; 
-            border: none; color: white; padding: 8px 12px; cursor: pointer; border-radius: 4px;
+            position: absolute; top: 10px; left: 290px; background: #fff; 
+            border: none; color: #000; padding: 8px 12px; cursor: pointer; border-radius: 4px;
+            font-size: 0.8rem; font-weight: bold; z-index: 11; transition: left 0.3s;
         }
         #gui-container.collapsed + #btn-toggle { left: 10px; }
+
+        #status-bar {
+            position: absolute; bottom: 10px; right: 10px; color: #666; font-size: 0.7rem; pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -50,30 +60,29 @@
         <button onclick="setCam('entero', 'Muestra el cuerpo completo y su relación con el espacio.')">Plano Entero</button>
         <button onclick="setCam('medio', 'Corte a la cintura. Equilibra sujeto y expresión corporal.')">Plano Medio</button>
         <button onclick="setCam('primer', 'Resalta la emoción y el detalle de la luz en el rostro.')">Primer Plano</button>
-        <div id="cam-theory" class="theory-box">Selecciona un plano para ver su concepto.</div>
+        <button onclick="resetView('Ajuste automático para centrar el modelo subido.')">Auto-Ajustar Modelo</button>
+        <div id="cam-theory" class="theory-box">Usa OrbitControls para mover la cámara (clic izq/der/rueda).</div>
     </div>
 
     <div class="section">
         <h3>2. Esquemas de Luz</h3>
         <button onclick="setLightPreset('rembrandt', 'Luz a 45°. Crea un triángulo de luz en la mejilla opuesta.')">Rembrandt</button>
         <button onclick="setLightPreset('split', 'Luz lateral a 90°. Máximo dramatismo y texturas.')">Luz Lateral</button>
-        <button onclick="setLightPreset('cenital', 'Luz superior. Crea sombras profundas en las cuencas oculares.')">Cenital</button>
-        <div id="light-theory" class="theory-box">La dirección de la luz define el volumen.</div>
+        <button onclick="setLightPreset('cenital', 'Luz superior. Crea sombras profundas.')">Cenital</button>
+        <div id="light-theory" class="theory-box">La dirección de la luz define el volumen. Mueve el farol con los sliders.</div>
     </div>
 
     <div class="section">
         <h3>3. Controles Manuales</h3>
-        <div class="control-row">
-            <span>Intensidad</span>
-            <input type="range" min="0" max="20" step="0.1" value="5" oninput="updateLightPower(this.value)">
-        </div>
-        <div class="control-row">
-            <span>Color</span>
-            <input type="color" value="#ffffff" onchange="updateLightColor(this.value)">
-        </div>
+        <div class="control-row"><span>Intensidad</span><input type="range" min="0" max="20" step="0.1" value="5" oninput="updateLightPower(this.value)"></div>
+        <div class="control-row"><span>Color</span><input type="color" value="#ffffff" onchange="updateLightColor(this.value)"></div>
+        <div class="control-row"><span>Posición X</span><input type="range" min="-5" max="5" step="0.1" value="2" oninput="updateLightPos('x', this.value)"></div>
+        <div class="control-row"><span>Altura Y</span><input type="range" min="0" max="5" step="0.1" value="3" oninput="updateLightPos('y', this.value)"></div>
+        <div class="control-row"><span>Profundidad Z</span><input type="range" min="-5" max="5" step="0.1" value="3" oninput="updateLightPos('z', this.value)"></div>
     </div>
 </div>
 <button id="btn-toggle" onclick="document.getElementById('gui-container').classList.toggle('collapsed')">TEORÍA</button>
+<div id="status-bar">Cargando modelo...</div>
 
 <script type="importmap">
     { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
@@ -93,63 +102,115 @@
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
+    controls.target.set(0, 1, 0);
+    camera.position.set(2, 2, 4);
+    controls.update();
 
     // Luces
     const mainLight = new THREE.SpotLight(0xffffff, 5);
     mainLight.position.set(2, 3, 3);
     mainLight.castShadow = true;
+    mainLight.shadow.mapSize.width = 1024;
+    mainLight.shadow.mapSize.height = 1024;
     scene.add(mainLight);
     
     const ambient = new THREE.AmbientLight(0xffffff, 0.1);
     scene.add(ambient);
 
-    // Representación física de la luz (Farol)
-    const lightBulb = new THREE.Mesh(new THREE.SphereGeometry(0.1), new THREE.MeshBasicMaterial({ color: 0xffffff }));
-    scene.add(lightBulb);
+    // Farol Visible (Monocromo)
+    const lightFixture = new THREE.Group();
+    const housing = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.3), new THREE.MeshBasicMaterial({ color: 0x1a1a1a }));
+    const lens = new THREE.Mesh(new THREE.CircleGeometry(0.08, 16), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    lens.position.z = 0.151;
+    lightFixture.add(housing, lens);
+    scene.add(lightFixture);
 
-    // Cargar Modelo
+    // Suelo Sutil
+    const gridHelper = new THREE.GridHelper(10, 10, 0x1a1a1a, 0x050505);
+    scene.add(gridHelper);
+
+    // Cargar Modelo con Auto-Ajuste
     const loader = new GLTFLoader();
+    let model;
     loader.load('modelo.glb', (gltf) => {
-        const model = gltf.scene;
-        model.traverse(n => { if(n.isMesh) n.castShadow = n.receiveShadow = true; });
-        
-        // Auto-escala
-        const box = new THREE.Box3().setFromObject(model);
-        const size = box.getSize(new THREE.Vector3()).length();
-        model.scale.set(2/size, 2/size, 2/size);
+        model = gltf.scene;
+        model.traverse(n => { if(n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
         scene.add(model);
         mainLight.target = model;
+        
+        // --- FUNCIÓN CRÍTICA DE AUTO-AJUSTE ---
+        // 1. Calcular el "cajón" (bounding box) del modelo subido
+        const box = new THREE.Box3().setFromObject(model);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+
+        // 2. Centrar el modelo en el origen (0,0,0)
+        model.position.x += (model.position.x - center.x);
+        model.position.y += (model.position.y - center.y);
+        model.position.z += (model.position.z - center.z);
+        
+        // 3. Escalar el modelo para que tenga un tamaño estándar (ej: 2 unidades de alto)
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const desiredSize = 2; // Unidades Three.js
+        const scaleFactor = desiredSize / maxDim;
+        model.scale.set(scaleFactor, scaleFactor, scaleFactor);
+        
+        document.getElementById('status-bar').innerText = `Modelo cargado: ${model.children.length} meshes.`;
+        resetView('Modelo cargado y auto-ajustado.');
+
+    }, (xhr) => {
+        document.getElementById('status-bar').innerText = `Cargando: ${Math.round(xhr.loaded / xhr.total * 100)}%`;
+    }, (error) => {
+        console.error(error);
+        document.getElementById('status-bar').innerText = 'Error: no se encontró modelo.glb';
+        document.getElementById('status-bar').style.color = '#ff4444';
     });
 
     // Funciones de la App
     window.setCam = (type, theory) => {
         document.getElementById('cam-theory').innerText = theory;
-        if(type === 'entero') camera.position.set(0, 1, 5);
-        if(type === 'medio') camera.position.set(0, 1.4, 2.5);
-        if(type === 'primer') camera.position.set(0, 1.7, 1.2);
+        controls.target.set(0, 1, 0); // Apuntar al torso (asumiendo altura 2)
+        if(type === 'entero') camera.position.set(0, 1, 4.5);
+        if(type === 'medio') camera.position.set(0, 1.4, 2);
+        if(type === 'primer') camera.position.set(0, 1.65, 0.8);
+        controls.update();
+    };
+
+    window.resetView = (theory) => {
+        document.getElementById('cam-theory').innerText = theory;
         controls.target.set(0, 1, 0);
+        camera.position.set(0, 1, 4.5); // Vista frontal estándar
+        controls.update();
     };
 
     window.setLightPreset = (type, theory) => {
         document.getElementById('light-theory').innerText = theory;
         if(type === 'rembrandt') mainLight.position.set(2, 3, 2);
-        if(type === 'split') mainLight.position.set(4, 1.5, 0);
+        if(type === 'split') mainLight.position.set(3, 1.5, 0);
         if(type === 'cenital') mainLight.position.set(0, 5, 0);
     };
 
     window.updateLightPower = (val) => mainLight.intensity = val;
     window.updateLightColor = (val) => {
         mainLight.color.set(val);
-        lightBulb.material.color.set(val);
+        lens.material.color.set(val); // El lente del farol cambia de color
     };
+    window.updateLightPos = (axis, val) => mainLight.position[axis] = val;
 
     function animate() {
         requestAnimationFrame(animate);
-        lightBulb.position.copy(mainLight.position);
+        lightFixture.position.copy(mainLight.position);
+        lightFixture.lookAt(0, 1, 0); // El farol siempre mira al modelo
         controls.update();
         renderer.render(scene, camera);
     }
     animate();
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
 </script>
 </body>
 </html>
