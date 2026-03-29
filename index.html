@@ -2,34 +2,48 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Estudio Pro - 3 Puntos de Luz (Monocromo)</title>
+    <title>Estudio Pro: Control Total (Estilo Blender)</title>
     <style>
         body { margin: 0; background: #000; color: #fff; font-family: 'Inter', sans-serif; overflow: hidden; }
         canvas { display: block; }
 
-        /* UI Monocromática */
+        /* UI Monocromo y Translúcido */
         #gui { 
-            position: absolute; top: 0; left: 0; width: 280px; height: 100%; 
-            background: rgba(10, 10, 10, 0.95); border-right: 1px solid #333;
+            position: absolute; top: 0; left: 0; width: 300px; height: 100%; 
+            background: rgba(10, 10, 10, 0.9); border-right: 1px solid #333;
             padding: 20px; box-sizing: border-box; overflow-y: auto; transition: 0.3s; z-index: 10;
         }
         #gui.collapsed { transform: translateX(-100%); }
         
         .section { margin-bottom: 20px; border-bottom: 1px solid #222; padding-bottom: 10px; }
-        h3 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: #fff; margin-bottom: 15px; font-weight: 600; }
+        h3 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: #fff; margin: 0 0 15px 0; font-weight: 600; }
         
-        .theory { background: #1a1a1a; padding: 10px; font-size: 0.7rem; color: #bbb; margin-bottom: 10px; line-height: 1.4; border-left: 2px solid #fff; }
-
         button { 
             width: 100%; background: #000; border: 1px solid #444; color: #fff; 
             padding: 8px; cursor: pointer; font-size: 0.75rem; margin-bottom: 4px; transition: 0.2s;
+            text-align: left;
         }
         button:hover { background: #fff; color: #000; }
+        button.active { background: #fff; color: #000; font-weight: bold;}
 
-        .control { display: flex; align-items: center; justify-content: space-between; font-size: 0.7rem; margin-top: 8px; color: #888; }
+        /* Controles Blender-like (XYZ) */
+        .xyz-control { display: flex; gap: 5px; margin-top: 10px; }
+        .xyz-control button { width: 30px; text-align: center; font-weight: bold;}
+        .xyz-control button.x { background: #ff4444; color: white;}
+        .xyz-control button.y { background: #44ff44; color: black;}
+        .xyz-control button.z { background: #4444ff; color: white;}
+
+        .control-row { display: flex; align-items: center; justify-content: space-between; font-size: 0.7rem; margin-top: 8px; color: #888; }
         input[type=range] { width: 60%; accent-color: #fff; }
 
-        #toggle { position: absolute; top: 10px; left: 290px; background: #fff; border: none; padding: 5px 10px; cursor: pointer; font-weight: bold; z-index: 11;}
+        /* Visor de Cámara */
+        #camera-visor {
+            position: absolute; top: 10px; right: 10px; width: 220px;
+            background: rgba(10, 10, 10, 0.9); border: 1px solid #333;
+            padding: 15px; border-radius: 4px; z-index: 10;
+        }
+
+        #toggle { position: absolute; top: 10px; left: 310px; background: #fff; border: none; padding: 5px 10px; cursor: pointer; font-weight: bold; z-index: 11;}
         #gui.collapsed + #toggle { left: 10px; }
         
         #log { position: absolute; bottom: 10px; right: 10px; font-size: 0.6rem; color: #444; pointer-events: none; }
@@ -39,19 +53,35 @@
 
 <div id="gui">
     <div class="section">
-        <h3>Esquema 3 Puntos</h3>
-        <div class="theory">
-            <b>Key Light:</b> Luz principal (modelado).<br>
-            <b>Fill Light:</b> Suaviza sombras (contraste).<br>
-            <b>Back Light:</b> Silueta (separación).
-        </div>
-        <button onclick="window.location.reload()">Resetear Escena (Esfera)</button>
+        <h3>1. Objetos</h3>
+        <button onclick="window.location.reload()">Resetear (Esfera)</button>
         <button onclick="loadHumanModel()" style="background: #222; border-color: #555;">Cargar Figura Humana (.glb)</button>
     </div>
 
-    <div id="lights-controls"></div>
+    <div class="section">
+        <h3>2. Luces (Estilo Blender)</h3>
+        <div id="lights-controls"></div>
+        <div class="theory">Arrastra el farol directamente o usa los controles para mover la luz.</div>
+    </div>
 </div>
-<button id="toggle" onclick="document.getElementById('gui').classList.toggle('collapsed')">TEORÍA</button>
+<button id="toggle" onclick="document.getElementById('gui').classList.toggle('collapsed')">MENU</button>
+
+<div id="camera-visor">
+    <h3>3. Visor de Cámara</h3>
+    <button onclick="setCamPreset('entero')">Plano Entero</button>
+    <button onclick="setCamPreset('medio')">Plano Medio</button>
+    <button onclick="setCamPreset('primer')">Primer Plano</button>
+    <div class="xyz-control">
+        <button class="x" onclick="nudgeCam('x')">X+</button>
+        <button class="y" onclick="nudgeCam('y')">Y+</button>
+        <button class="z" onclick="nudgeCam('z')">Z+</button>
+    </div>
+    <div style="display:flex; gap: 5px; margin-top:10px;">
+        <button onclick="saveCurrentCam()">Guardar Posición</button>
+        <button onclick="loadSavedCam()">Cargar Guardada</button>
+    </div>
+</div>
+
 <div id="log">Objeto por defecto: Esfera</div>
 
 <script type="importmap">
@@ -64,116 +94,45 @@
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
     const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x050505);
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Sombras suaves
     document.body.appendChild(renderer.domElement);
 
     const controls = new OrbitControls(camera, renderer.domElement);
-    camera.position.set(2, 2, 5);
-    controls.target.set(0, 1, 0);
     controls.enableDamping = true;
 
     const studioLights = [];
     let currentObject;
+    let savedCamState;
 
-    // 1. Crear Luces con Faroles Monocromos
-    function createLight(name, color, pos, intensity) {
+    // 1. Entorno: Suelo y Ciclorama
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 1 });
+    const wall = new THREE.Mesh(new THREE.CylinderGeometry(10, 10, 10, 32, 1, true), wallMat);
+    wall.position.y = 5;
+    scene.add(wall);
+
+    // 2. Luces XYZ (Tipo Joystick/Blender)
+    function createXYZLight(name, color, pos, intensity) {
         const group = new THREE.Group();
         const light = new THREE.SpotLight(color, intensity, 20, 0.6, 0.5);
         light.castShadow = true;
         
-        // Farol Físico (Gris Oscuro)
-        const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.25), new THREE.MeshStandardMaterial({color: 0x222222}));
-        const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.07), new THREE.MeshBasicMaterial({color: color}));
-        bulb.position.z = 0.13;
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.3), new THREE.MeshStandardMaterial({color: 0x222222}));
+        const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.1), new THREE.MeshBasicMaterial({color: color}));
+        bulb.position.z = 0.15;
         
         group.add(mesh, bulb, light);
         group.position.copy(pos);
         scene.add(group);
 
         const folder = document.createElement('div');
-        folder.className = 'section';
-        folder.innerHTML = `<h3>${name}</h3>
-            <div class="control">Poder <input type="range" min="0" max="150" value="${intensity}" oninput="updateL('${name}', 'i', this.value)"></div>
-            <div class="control">Altura <input type="range" min="0" max="7" value="${pos.y}" step="0.1" oninput="updateL('${name}', 'y', this.value)"></div>`;
-        document.getElementById('lights-controls').appendChild(folder);
-
-        return { group, light, name };
-    }
-
-    const key = createLight('Key Light', 0xffffff, new THREE.Vector3(-2.5, 3, 2.5), 60);
-    const fill = createLight('Fill Light', 0xcccccc, new THREE.Vector3(3, 1.5, 2), 20);
-    const back = createLight('Back Light', 0xffffff, new THREE.Vector3(0, 4, -3), 80);
-    studioLights.push(key, fill, back);
-
-    // 2. Cargar Esfera por Defecto
-    function loadDefaultSphere() {
-        if (currentObject) scene.remove(currentObject);
-        const geometry = new THREE.SphereGeometry(1, 32, 32);
-        const material = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.5 });
-        currentObject = new THREE.Mesh(geometry, material);
-        currentObject.position.y = 1;
-        currentObject.castShadow = true;
-        currentObject.receiveShadow = true;
-        scene.add(currentObject);
-        studioLights.forEach(l => l.light.target = currentObject);
-        document.getElementById('log').innerText = "Objeto por defecto: Esfera";
-    }
-    loadDefaultSphere();
-
-    // 3. Función para Cargar Figura Humana (modelo.glb)
-    window.loadHumanModel = () => {
-        const loader = new GLTFLoader();
-        document.getElementById('log').innerText = "Cargando modelo.glb...";
-        
-        loader.load('modelo.glb', (gltf) => {
-            if (currentObject) scene.remove(currentObject);
-            currentObject = gltf.scene;
-            scene.add(currentObject);
-            
-            // Auto-ajuste de escala y posición
-            const box = new THREE.Box3().setFromObject(currentObject);
-            const center = box.getCenter(new THREE.Vector3());
-            const size = box.getSize(new THREE.Vector3());
-            
-            currentObject.position.x += (currentObject.position.x - center.x);
-            currentObject.position.y += (currentObject.position.y - center.y);
-            currentObject.position.z += (currentObject.position.z - center.z);
-            
-            const desiredSize = 2.5; // Unidades Three.js
-            const maxDim = Math.max(size.x, size.y, size.z);
-            const scale = desiredSize / maxDim;
-            currentObject.scale.set(scale, scale, scale);
-            
-            currentObject.traverse(n => { if(n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
-            studioLights.forEach(l => l.light.target = currentObject);
-            
-            document.getElementById('log').innerText = "Figura humana cargada con éxito.";
-        }, 
-        (xhr) => { document.getElementById('log').innerText = `Cargando: ${Math.round(xhr.loaded/xhr.total*100)}%`; },
-        (err) => { 
-            document.getElementById('log').innerText = "Error: no se encontró modelo.glb. Retomando Esfera.";
-            loadDefaultSphere();
-        });
-    }
-
-    // Controles de Luces
-    window.updateL = (name, param, val) => {
-        const l = studioLights.find(sl => sl.name === name);
-        if(param === 'i') l.light.intensity = parseFloat(val);
-        if(param === 'y') l.group.position.y = parseFloat(val);
-    };
-
-    function animate() {
-        requestAnimationFrame(animate);
-        studioLights.forEach(l => l.group.lookAt(0, 1, 0));
-        controls.update();
-        renderer.render(scene, camera);
-    }
-    animate();
-</script>
-</body>
-</html>
+        folder.className =
