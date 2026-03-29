@@ -2,136 +2,111 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simulador de Iluminación Foto/Cine</title>
+    <title>Simulador Pro - Foto/Cine</title>
     <style>
-        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; }
-        canvas { display: block; }
+        body { margin: 0; background: #000; overflow: hidden; font-family: 'Inter', sans-serif; }
+        /* Estilo Blender-like con transparencias */
+        .dg.main { right: 10px !important; top: 10px !important; }
+        .dg li.title { background: rgba(0, 30, 60, 0.8) !important; color: #0088ff !important; border-bottom: 1px solid #0055ff; }
+        .dg .cr.number input[type=text], .dg .cr.string input[type=text] { background: #050505 !important; color: #0088ff !important; }
         
-        /* Interfaz Minimalista */
-        #ui { 
-            position: absolute; top: 0; left: 0; width: 250px; height: 100%; 
-            background: rgba(0, 10, 20, 0.9); border-right: 1px solid #0055ff;
-            transition: transform 0.3s; padding: 20px; box-sizing: border-box;
-            display: flex; flex-direction: column; gap: 20px;
+        #menu-left {
+            position: absolute; top: 10px; left: 10px; width: 200px;
+            background: rgba(0, 5, 15, 0.7); backdrop-filter: blur(5px);
+            border: 1px solid rgba(0, 85, 255, 0.3); padding: 15px; border-radius: 4px;
         }
-        #ui.collapsed { transform: translateX(-100%); }
-        
-        h3 { color: #0088ff; font-size: 0.9rem; text-transform: uppercase; margin-bottom: 10px; }
-        .group { display: flex; flex-direction: column; gap: 5px; }
-        
+        h3 { color: #0088ff; font-size: 12px; letter-spacing: 1px; margin: 0 0 10px 0; }
         button { 
-            background: #111; border: 1px solid #333; color: #ccc; 
-            padding: 8px; text-align: left; cursor: pointer; font-size: 0.8rem;
+            width: 100%; background: rgba(255,255,255,0.05); border: 1px solid #222; 
+            color: #ccc; padding: 6px; margin-bottom: 4px; cursor: pointer; text-align: left;
         }
-        button:hover { background: #002244; border-color: #0088ff; color: #fff; }
-        button.active { background: #004488; color: white; border-color: #0088ff; }
-
-        #toggle { 
-            position: absolute; top: 10px; left: 260px; background: #001122; 
-            border: 1px solid #0055ff; color: #fff; cursor: pointer; padding: 5px 10px;
-        }
-        #ui.collapsed + #toggle { left: 10px; }
+        button:hover { background: rgba(0, 85, 255, 0.2); color: #fff; }
     </style>
 </head>
 <body>
 
-<div id="ui">
-    <div class="group">
-        <h3>Cámaras (Encuadres)</h3>
-        <button onclick="setCamera('entero')">Plano Entero</button>
-        <button onclick="setCamera('medio')">Plano Medio</button>
-        <button onclick="setCamera('primer')">Primer Plano</button>
-    </div>
-    <div class="group">
-        <h3>Iluminación</h3>
-        <button onclick="setLight('frontal')">Frontal</button>
-        <button onclick="setLight('lateral')">Lateral (Split)</button>
-        <button onclick="setLight('rembrandt')">Rembrandt</button>
-        <button onclick="setLight('mariposa')">Mariposa</button>
-        <button onclick="setLight('tres')">Tres Puntos</button>
-    </div>
+<div id="menu-left">
+    <h3>PRESETS CÁMARA</h3>
+    <button onclick="setCam(0, 1, 4)">Plano Entero</button>
+    <button onclick="setCam(0, 1.4, 1.8)">Plano Medio</button>
+    <button onclick="setCam(0, 1.65, 0.7)">Primer Plano</button>
 </div>
-<button id="toggle" onclick="document.getElementById('ui').classList.toggle('collapsed')">☰ Menu</button>
 
 <script type="importmap">
-    { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+{
+    "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+}
 </script>
 
 <script type="module">
     import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GUI } from 'https://cdn.jsdelivr.net/npm/lil-gui@0.19/+esm';
 
-    // Configuración Escena
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
     document.body.appendChild(renderer.domElement);
 
-    // Sujeto (Cilindros/Esferas simulando figura humana para ligereza máxima)
-    const bodyGroup = new THREE.Group();
-    const mat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.7 });
-    
-    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.25, 0.6, 4, 16), mat);
-    torso.position.y = 1.2; torso.castShadow = true;
-    
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 16), mat);
-    head.position.y = 1.75; head.castShadow = true;
-    
-    bodyGroup.add(torso, head);
-    scene.add(bodyGroup);
-
-    // Suelo
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), new THREE.MeshStandardMaterial({ color: 0x111111 }));
-    floor.rotation.x = -Math.PI / 2;
-    floor.receiveShadow = true;
-    scene.add(floor);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    camera.position.set(0, 1.5, 4);
 
     // Luces
-    const mainLight = new THREE.SpotLight(0xffffff, 50);
-    mainLight.castShadow = true;
-    scene.add(mainLight);
-    const fillLight = new THREE.PointLight(0xffffff, 5); // Para relleno
-    scene.add(fillLight);
-    fillLight.visible = false;
+    const light = new THREE.SpotLight(0xffffff, 10);
+    light.position.set(2, 3, 3);
+    light.castShadow = true;
+    scene.add(light);
+    
+    const ambient = new THREE.AmbientLight(0xffffff, 0.2);
+    scene.add(ambient);
 
-    // Funciones Globales
-    window.setCamera = (type) => {
-        if(type === 'entero') camera.position.set(0, 1, 4);
-        if(type === 'medio') camera.position.set(0, 1.4, 2);
-        if(type === 'primer') camera.position.set(0, 1.7, 0.8);
-        camera.lookAt(0, 1.3, 0);
+    // CARGAR TU MODELO .GLB
+    const loader = new GLTFLoader();
+    loader.load('modelo.glb', (gltf) => {
+        const model = gltf.scene;
+        model.traverse(n => { if(n.isMesh) n.castShadow = n.receiveShadow = true; });
+        scene.add(model);
+    }, undefined, (error) => {
+        console.error("No se encontró modelo.glb, usando placeholder.");
+        const placeholder = new THREE.Mesh(new THREE.CapsuleGeometry(0.3, 1.2), new THREE.MeshStandardMaterial());
+        placeholder.position.y = 0.9;
+        scene.add(placeholder);
+    });
+
+    // Suelo infinito
+    const grid = new THREE.GridHelper(20, 20, 0x0055ff, 0x111111);
+    scene.add(grid);
+
+    // GUI - PANEL TIPO BLENDER
+    const gui = new GUI({ title: 'CONTROLES PRO' });
+    
+    const lightFolder = gui.addFolder('Iluminación');
+    lightFolder.add(light.position, 'x', -5, 5).name('Posición X');
+    lightFolder.add(light.position, 'y', 0, 7).name('Altura');
+    lightFolder.add(light.position, 'z', -5, 5).name('Profundidad');
+    lightFolder.add(light, 'intensity', 0, 100).name('Intensidad');
+    lightFolder.addColor({ color: 0xffffff }, 'color').onChange(v => light.color.set(v)).name('Color');
+    
+    const camFolder = gui.addFolder('Cámara Libre');
+    camFolder.add(camera, 'fov', 15, 90).onChange(() => camera.updateProjectionMatrix());
+
+    window.setCam = (x, y, z) => {
+        camera.position.set(x, y, z);
+        controls.target.set(0, y, 0);
+        controls.update();
     };
-
-    window.setLight = (type) => {
-        fillLight.visible = false;
-        if(type === 'frontal') mainLight.position.set(0, 1.7, 3);
-        if(type === 'lateral') mainLight.position.set(3, 1.7, 0);
-        if(type === 'rembrandt') mainLight.position.set(2, 3, 2);
-        if(type === 'mariposa') mainLight.position.set(0, 4, 1.5);
-        if(type === 'tres') {
-            mainLight.position.set(-2, 2, 2);
-            fillLight.position.set(2, 1, 1);
-            fillLight.visible = true;
-        }
-    };
-
-    // Inicio
-    setCamera('entero');
-    setLight('tres');
 
     function animate() {
         requestAnimationFrame(animate);
         renderer.render(scene, camera);
     }
     animate();
-
-    window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-    });
 </script>
 </body>
 </html>
