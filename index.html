@@ -2,28 +2,19 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Estudio de Iluminación Renacentista</title>
+    <title>Estudio de Iluminación Pro</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; font-family: 'Inter', sans-serif; }
-        
-        /* Estilo lil-gui Transparente y Azul */
-        .dg.main { right: 10px !important; top: 10px !important; width: 300px !important; }
-        .dg li.title { background: rgba(0, 20, 40, 0.8) !important; color: #00aaff !important; border-bottom: 1px solid #0055ff; text-shadow: 0 0 5px #00aaff; }
-        .dg .cr.number input[type=text], .dg .cr.string input[type=text] { background: rgba(0,0,0,0.5) !important; color: #00aaff !important; border: 1px solid #0055ff; }
-        .dg .cr.color label { border: 1px solid #0055ff; }
-        .dg .c input[type=checkbox] { accent-color: #00aaff; }
-        
-        #instructions {
-            position: absolute; bottom: 10px; left: 10px;
-            color: rgba(255, 255, 255, 0.5); font-size: 12px;
-            background: rgba(0, 0, 0, 0.5); padding: 5px; border-radius: 4px;
-            pointer-events: none;
+        body { margin: 0; background: #000; overflow: hidden; font-family: sans-serif; }
+        .dg.main { right: 10px !important; top: 10px !important; }
+        #loader-info {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: #0088ff; font-size: 14px; pointer-events: none;
         }
     </style>
 </head>
 <body>
 
-<div id="instructions">Arrastra: Rotar | Rueda: Zoom | Click Derecho: Pan</div>
+<div id="loader-info">Cargando modelo...</div>
 
 <script type="importmap">
 {
@@ -40,147 +31,95 @@
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { GUI } from 'https://cdn.jsdelivr.net/npm/lil-gui@0.19/+esm';
 
-    // 1. Escena y Render
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Sombras suaves
     document.body.appendChild(renderer.domElement);
 
-    // 2. Controles de Cámara (OrbitControls)
     const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true; // Suavizado
-    controls.target.set(0, 1.2, 0); // Apuntar al torso
-    camera.position.set(2, 2, 4);
-    controls.update();
+    const gui = new GUI({ title: 'CONTROLES DE SET' });
 
-    // 3. Suelo y Entorno
-    const groundMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), groundMat);
-    ground.rotation.x = -Math.PI / 2;
-    ground.receiveShadow = true;
-    scene.add(ground);
-    
-    // Grid sutil
-    const grid = new THREE.GridHelper(10, 10, 0x003366, 0x050505);
-    scene.add(grid);
-
-    // 4. Cargar el Modelo (.glb)
-    const loader = new GLTFLoader();
-    let model;
-    loader.load('modelo.glb', (gltf) => {
-        model = gltf.scene;
-        model.traverse(n => { if(n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
-        // Ajuste de escala/posición si es necesario (asumiendo tamaño real)
-        model.position.y = 0.01;
-        scene.add(model);
-    }, undefined, (error) => {
-        console.error("No se encontró modelo.glb o hubo un error al cargar.");
-        const placeholder = new THREE.Mesh(new THREE.CapsuleGeometry(0.3, 1.2), new THREE.MeshStandardMaterial({ color: 0xaaaaaa }));
-        placeholder.position.y = 0.9;
-        scene.add(placeholder);
-    });
-
-    // 5. Sistema de Luces (Visibles)
-    function createVisibleLight(color, intensity, isSpot = false) {
+    // 1. ILUMINACIÓN (Faroles Visibles)
+    function createStudioLight(name, color, x, y, z) {
         const group = new THREE.Group();
-        
-        // Geometría del farol (simple: cubo con "visera")
-        const housingMat = new THREE.MeshBasicMaterial({ color: 0x050505 });
-        const housing = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.3), housingMat);
-        group.add(housing);
-        
-        // El "foco" brillante
-        const lensMat = new THREE.MeshBasicMaterial({ color: color });
-        const lens = new THREE.Mesh(new THREE.CircleGeometry(0.08, 16), lensMat);
-        lens.position.z = 0.151;
-        group.add(lens);
-
-        let light;
-        if(isSpot) {
-            light = new THREE.SpotLight(color, intensity, 10, Math.PI / 4, 0.5, 1);
-            // Visera para spot
-            const barnMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
-            const barn = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.2, 4, 1, true), barnMat);
-            barn.rotation.x = -Math.PI / 2;
-            barn.position.z = 0.2;
-            group.add(barn);
-        } else {
-            light = new THREE.DirectionalLight(color, intensity);
-        }
-        
+        const light = new THREE.SpotLight(color, 100);
         light.castShadow = true;
-        light.shadow.mapSize.width = 1024;
-        light.shadow.mapSize.height = 1024;
-        light.target.position.set(0, 1.2, 0); // Apuntar a la escultura
+        
+        const mesh = new THREE.Mesh(
+            new THREE.BoxGeometry(0.2, 0.2, 0.2),
+            new THREE.MeshBasicMaterial({ color: color })
+        );
         
         group.add(light);
+        group.add(mesh);
+        group.position.set(x, y, z);
         scene.add(group);
-        scene.add(light.target);
 
-        return { group, light, lens };
+        const f = gui.addFolder(name);
+        f.add(group.position, 'x', -10, 10).name('X');
+        f.add(group.position, 'y', -10, 10).name('Altura');
+        f.add(group.position, 'z', -10, 10).name('Z');
+        f.add(light, 'intensity', 0, 500).name('Intensidad');
+        f.addColor({ c: color }, 'c').onChange(v => {
+            light.color.set(v);
+            mesh.material.color.set(v);
+        }).name('Color');
+
+        return { group, light };
     }
 
-    // Crear 3 luces
-    const keyLight = createVisibleLight(0xffffff, 50, true);   // Luz Principal (Spot)
-    const fillLight = createVisibleLight(0xffffee, 20, false); // Luz Relleno (Dir)
-    const backLight = createVisibleLight(0xffffff, 30, true);  // Contra (Spot)
+    const principal = createStudioLight('Luz Principal', 0xffffff, 2, 3, 2);
+    const relleno = createStudioLight('Luz Relleno', 0x4444ff, -2, 2, 2);
+    const contra = createStudioLight('Contraluz', 0xffffff, 0, 4, -3);
 
-    // Posiciones iniciales
-    keyLight.group.position.set(-2, 3, 2);
-    fillLight.group.position.set(3, 1, 1);
-    backLight.group.position.set(0, 4, -3);
+    // 2. CARGA DEL MODELO CON AUTO-ESCALA
+    const loader = new GLTFLoader();
+    loader.load('modelo.glb', (gltf) => {
+        document.getElementById('loader-info').style.display = 'none';
+        const model = gltf.scene;
+        
+        // Centrar y ajustar tamaño automáticamente
+        const box = new THREE.Box3().setFromObject(model);
+        const size = box.getSize(new THREE.Vector3()).length();
+        const center = box.getCenter(new THREE.Vector3());
+        
+        model.position.x += (model.position.x - center.x);
+        model.position.y += (model.position.y - center.y);
+        model.position.z += (model.position.z - center.z);
+        
+        const scale = 2 / size;
+        model.scale.set(scale, scale, scale);
+        
+        model.traverse(n => { if(n.isMesh) n.castShadow = n.receiveShadow = true; });
+        scene.add(model);
+        
+        principal.light.target = model;
+        relleno.light.target = model;
+        contra.light.target = model;
+        
+    }, undefined, (err) => {
+        document.getElementById('loader-info').innerText = 'Error: modelo.glb no encontrado';
+    });
 
-    // 6. GUI (Controles Pro)
-    const gui = new GUI({ title: 'PANEL ILUMINACIÓN Set' });
-    
-    // Función auxiliar para presets de posición
-    function setLightPreset(lightObj, type) {
-        if(type === 'frontal') lightObj.group.position.set(0, 1.2, 3);
-        if(type === 'cenital') lightObj.group.position.set(0, 5, 0);
-        if(type === 'picada') lightObj.group.position.set(0, 3, 2);
-        if(type === 'contrapicada') lightObj.group.position.set(0, -1, 3);
-        if(type === 'lateral') lightObj.group.position.set(-3, 1.2, 0);
-        if(type === 'rembrandt') lightObj.group.position.set(-2, 3, 2);
-        if(type === '45 grados') lightObj.group.position.set(-2, 2, 2);
-    }
+    camera.position.set(0, 2, 5);
+    controls.update();
 
-    function addLightControls(folder, lightObj, name) {
-        folder.add({ visible: true }, 'visible').name('Encender').onChange(v => {
-            lightObj.light.visible = v;
-            lightObj.lens.visible = v;
-            lightObj.group.children[0].visible = v; // Housing
-            if(lightObj.group.children.length > 2) lightObj.group.children[2].visible = v; // Visera
-        });
-        folder.addColor({ color: 0xffffff }, 'color').name('Color').onChange(v => {
-            lightObj.light.color.set(v);
-            lightObj.lens.material.color.set(v);
-        });
-        folder.add(lightObj.light, 'intensity', 0, 200).name('Intensidad ↑↓');
-        if(lightObj.light.isSpotLight) {
-            folder.add(lightObj.light, 'angle', 0.1, Math.PI/2).name('Difusión (Ángulo)');
-            folder.add(lightObj.light, 'penumbra', 0, 1).name('Suavizado Borde');
-        }
-
-        const posFolder = folder.addFolder('Presets Posición');
-        const presets = ['frontal', 'cenital', 'picada', 'contrapicada', 'lateral', 'rembrandt', '45 grados'];
-        presets.forEach(p => {
-            posFolder.add({ [p]: () => setLightPreset(lightObj, p) }, p);
-        });
-    }
-
-    const keyFolder = gui.addFolder('1. Luz Principal (Spot)');
-    addLightControls(keyFolder, keyLight, 'Principal');
-
-    const fillFolder = gui.addFolder('2. Luz Relleno (Direccional)');
-    addLightControls(fillFolder, fillLight, 'Relleno');
-
-    const backFolder = gui.addFolder('3. Contraluz (Spot)');
-    addLightControls(backFolder, backLight, 'Contra');
-
-    // 7. Bucle de Animación
     function animate() {
         requestAnimationFrame(animate);
-        controls.
+        principal.group.lookAt(0,0,0);
+        relleno.group.lookAt(0,0,0);
+        contra.group.lookAt(0,0,0);
+        renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+</script>
+</body>
+</html>
