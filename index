@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Iluminación Foto/Cine</title>
+    <style>
+        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; }
+        canvas { display: block; }
+        
+        /* Interfaz Minimalista */
+        #ui { 
+            position: absolute; top: 0; left: 0; width: 250px; height: 100%; 
+            background: rgba(0, 10, 20, 0.9); border-right: 1px solid #0055ff;
+            transition: transform 0.3s; padding: 20px; box-sizing: border-box;
+            display: flex; flex-direction: column; gap: 20px;
+        }
+        #ui.collapsed { transform: translateX(-100%); }
+        
+        h3 { color: #0088ff; font-size: 0.9rem; text-transform: uppercase; margin-bottom: 10px; }
+        .group { display: flex; flex-direction: column; gap: 5px; }
+        
+        button { 
+            background: #111; border: 1px solid #333; color: #ccc; 
+            padding: 8px; text-align: left; cursor: pointer; font-size: 0.8rem;
+        }
+        button:hover { background: #002244; border-color: #0088ff; color: #fff; }
+        button.active { background: #004488; color: white; border-color: #0088ff; }
+
+        #toggle { 
+            position: absolute; top: 10px; left: 260px; background: #001122; 
+            border: 1px solid #0055ff; color: #fff; cursor: pointer; padding: 5px 10px;
+        }
+        #ui.collapsed + #toggle { left: 10px; }
+    </style>
+</head>
+<body>
+
+<div id="ui">
+    <div class="group">
+        <h3>Cámaras (Encuadres)</h3>
+        <button onclick="setCamera('entero')">Plano Entero</button>
+        <button onclick="setCamera('medio')">Plano Medio</button>
+        <button onclick="setCamera('primer')">Primer Plano</button>
+    </div>
+    <div class="group">
+        <h3>Iluminación</h3>
+        <button onclick="setLight('frontal')">Frontal</button>
+        <button onclick="setLight('lateral')">Lateral (Split)</button>
+        <button onclick="setLight('rembrandt')">Rembrandt</button>
+        <button onclick="setLight('mariposa')">Mariposa</button>
+        <button onclick="setLight('tres')">Tres Puntos</button>
+    </div>
+</div>
+<button id="toggle" onclick="document.getElementById('ui').classList.toggle('collapsed')">☰ Menu</button>
+
+<script type="importmap">
+    { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+
+<script type="module">
+    import * as THREE from 'three';
+
+    // Configuración Escena
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    document.body.appendChild(renderer.domElement);
+
+    // Sujeto (Cilindros/Esferas simulando figura humana para ligereza máxima)
+    const bodyGroup = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.7 });
+    
+    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.25, 0.6, 4, 16), mat);
+    torso.position.y = 1.2; torso.castShadow = true;
+    
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 16), mat);
+    head.position.y = 1.75; head.castShadow = true;
+    
+    bodyGroup.add(torso, head);
+    scene.add(bodyGroup);
+
+    // Suelo
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), new THREE.MeshStandardMaterial({ color: 0x111111 }));
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    // Luces
+    const mainLight = new THREE.SpotLight(0xffffff, 50);
+    mainLight.castShadow = true;
+    scene.add(mainLight);
+    const fillLight = new THREE.PointLight(0xffffff, 5); // Para relleno
+    scene.add(fillLight);
+    fillLight.visible = false;
+
+    // Funciones Globales
+    window.setCamera = (type) => {
+        if(type === 'entero') camera.position.set(0, 1, 4);
+        if(type === 'medio') camera.position.set(0, 1.4, 2);
+        if(type === 'primer') camera.position.set(0, 1.7, 0.8);
+        camera.lookAt(0, 1.3, 0);
+    };
+
+    window.setLight = (type) => {
+        fillLight.visible = false;
+        if(type === 'frontal') mainLight.position.set(0, 1.7, 3);
+        if(type === 'lateral') mainLight.position.set(3, 1.7, 0);
+        if(type === 'rembrandt') mainLight.position.set(2, 3, 2);
+        if(type === 'mariposa') mainLight.position.set(0, 4, 1.5);
+        if(type === 'tres') {
+            mainLight.position.set(-2, 2, 2);
+            fillLight.position.set(2, 1, 1);
+            fillLight.visible = true;
+        }
+    };
+
+    // Inicio
+    setCamera('entero');
+    setLight('tres');
+
+    function animate() {
+        requestAnimationFrame(animate);
+        renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+</script>
+</body>
+</html>
