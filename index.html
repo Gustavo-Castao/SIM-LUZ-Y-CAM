@@ -2,124 +2,154 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Estudio de Iluminación Pro</title>
+    <title>Estudio de Fotografía: Teoría y Práctica</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; font-family: sans-serif; }
-        .dg.main { right: 10px !important; top: 10px !important; }
-        #loader-info {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            color: #0088ff; font-size: 14px; pointer-events: none;
+        body { margin: 0; background: #000; color: #fff; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+        canvas { display: block; }
+
+        /* UI Minimalista Azul/Negro */
+        #gui-container { 
+            position: absolute; top: 0; left: 0; width: 280px; height: 100%; 
+            background: rgba(0, 10, 20, 0.85); backdrop-filter: blur(10px);
+            border-right: 1px solid #0055ff; padding: 20px; box-sizing: border-box;
+            transition: transform 0.3s; overflow-y: auto;
         }
+        #gui-container.collapsed { transform: translateX(-100%); }
+        
+        .section { margin-bottom: 25px; border-bottom: 1px solid #003366; padding-bottom: 10px; }
+        h3 { color: #0088ff; font-size: 0.8rem; text-transform: uppercase; margin: 0 0 10px 0; letter-spacing: 1px; }
+        
+        /* Tooltip de Teoría */
+        .theory-box { 
+            background: rgba(0, 85, 255, 0.1); border-left: 3px solid #0088ff;
+            padding: 8px; font-size: 0.75rem; margin-top: 5px; color: #add8e6; line-height: 1.3;
+        }
+
+        button { 
+            width: 100%; background: #111; border: 1px solid #333; color: #ccc; 
+            padding: 10px; text-align: left; cursor: pointer; font-size: 0.8rem; margin-bottom: 5px;
+        }
+        button:hover { background: #002244; border-color: #0088ff; color: #fff; }
+        
+        .control-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 0.8rem; }
+        input[type=range] { flex-grow: 1; accent-color: #0088ff; }
+        input[type=color] { border: none; width: 30px; height: 30px; background: none; cursor: pointer; }
+
+        #btn-toggle { 
+            position: absolute; top: 10px; left: 290px; background: #0055ff; 
+            border: none; color: white; padding: 8px 12px; cursor: pointer; border-radius: 4px;
+        }
+        #gui-container.collapsed + #btn-toggle { left: 10px; }
     </style>
 </head>
 <body>
 
-<div id="loader-info">Cargando modelo...</div>
+<div id="gui-container">
+    <div class="section">
+        <h3>1. Encuadres (Cámara)</h3>
+        <button onclick="setCam('entero', 'Muestra el cuerpo completo y su relación con el espacio.')">Plano Entero</button>
+        <button onclick="setCam('medio', 'Corte a la cintura. Equilibra sujeto y expresión corporal.')">Plano Medio</button>
+        <button onclick="setCam('primer', 'Resalta la emoción y el detalle de la luz en el rostro.')">Primer Plano</button>
+        <div id="cam-theory" class="theory-box">Selecciona un plano para ver su concepto.</div>
+    </div>
+
+    <div class="section">
+        <h3>2. Esquemas de Luz</h3>
+        <button onclick="setLightPreset('rembrandt', 'Luz a 45°. Crea un triángulo de luz en la mejilla opuesta.')">Rembrandt</button>
+        <button onclick="setLightPreset('split', 'Luz lateral a 90°. Máximo dramatismo y texturas.')">Luz Lateral</button>
+        <button onclick="setLightPreset('cenital', 'Luz superior. Crea sombras profundas en las cuencas oculares.')">Cenital</button>
+        <div id="light-theory" class="theory-box">La dirección de la luz define el volumen.</div>
+    </div>
+
+    <div class="section">
+        <h3>3. Controles Manuales</h3>
+        <div class="control-row">
+            <span>Intensidad</span>
+            <input type="range" min="0" max="20" step="0.1" value="5" oninput="updateLightPower(this.value)">
+        </div>
+        <div class="control-row">
+            <span>Color</span>
+            <input type="color" value="#ffffff" onchange="updateLightColor(this.value)">
+        </div>
+    </div>
+</div>
+<button id="btn-toggle" onclick="document.getElementById('gui-container').classList.toggle('collapsed')">TEORÍA</button>
 
 <script type="importmap">
-{
-    "imports": {
-        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-    }
-}
+    { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
 </script>
 
 <script type="module">
     import * as THREE from 'three';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-    import { GUI } from 'https://cdn.jsdelivr.net/npm/lil-gui@0.19/+esm';
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
     document.body.appendChild(renderer.domElement);
 
     const controls = new OrbitControls(camera, renderer.domElement);
-    const gui = new GUI({ title: 'CONTROLES DE SET' });
+    controls.enableDamping = true;
 
-    // 1. ILUMINACIÓN (Faroles Visibles)
-    function createStudioLight(name, color, x, y, z) {
-        const group = new THREE.Group();
-        const light = new THREE.SpotLight(color, 100);
-        light.castShadow = true;
-        
-        const mesh = new THREE.Mesh(
-            new THREE.BoxGeometry(0.2, 0.2, 0.2),
-            new THREE.MeshBasicMaterial({ color: color })
-        );
-        
-        group.add(light);
-        group.add(mesh);
-        group.position.set(x, y, z);
-        scene.add(group);
+    // Luces
+    const mainLight = new THREE.SpotLight(0xffffff, 5);
+    mainLight.position.set(2, 3, 3);
+    mainLight.castShadow = true;
+    scene.add(mainLight);
+    
+    const ambient = new THREE.AmbientLight(0xffffff, 0.1);
+    scene.add(ambient);
 
-        const f = gui.addFolder(name);
-        f.add(group.position, 'x', -10, 10).name('X');
-        f.add(group.position, 'y', -10, 10).name('Altura');
-        f.add(group.position, 'z', -10, 10).name('Z');
-        f.add(light, 'intensity', 0, 500).name('Intensidad');
-        f.addColor({ c: color }, 'c').onChange(v => {
-            light.color.set(v);
-            mesh.material.color.set(v);
-        }).name('Color');
+    // Representación física de la luz (Farol)
+    const lightBulb = new THREE.Mesh(new THREE.SphereGeometry(0.1), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    scene.add(lightBulb);
 
-        return { group, light };
-    }
-
-    const principal = createStudioLight('Luz Principal', 0xffffff, 2, 3, 2);
-    const relleno = createStudioLight('Luz Relleno', 0x4444ff, -2, 2, 2);
-    const contra = createStudioLight('Contraluz', 0xffffff, 0, 4, -3);
-
-    // 2. CARGA DEL MODELO CON AUTO-ESCALA
+    // Cargar Modelo
     const loader = new GLTFLoader();
     loader.load('modelo.glb', (gltf) => {
-        document.getElementById('loader-info').style.display = 'none';
         const model = gltf.scene;
+        model.traverse(n => { if(n.isMesh) n.castShadow = n.receiveShadow = true; });
         
-        // Centrar y ajustar tamaño automáticamente
+        // Auto-escala
         const box = new THREE.Box3().setFromObject(model);
         const size = box.getSize(new THREE.Vector3()).length();
-        const center = box.getCenter(new THREE.Vector3());
-        
-        model.position.x += (model.position.x - center.x);
-        model.position.y += (model.position.y - center.y);
-        model.position.z += (model.position.z - center.z);
-        
-        const scale = 2 / size;
-        model.scale.set(scale, scale, scale);
-        
-        model.traverse(n => { if(n.isMesh) n.castShadow = n.receiveShadow = true; });
+        model.scale.set(2/size, 2/size, 2/size);
         scene.add(model);
-        
-        principal.light.target = model;
-        relleno.light.target = model;
-        contra.light.target = model;
-        
-    }, undefined, (err) => {
-        document.getElementById('loader-info').innerText = 'Error: modelo.glb no encontrado';
+        mainLight.target = model;
     });
 
-    camera.position.set(0, 2, 5);
-    controls.update();
+    // Funciones de la App
+    window.setCam = (type, theory) => {
+        document.getElementById('cam-theory').innerText = theory;
+        if(type === 'entero') camera.position.set(0, 1, 5);
+        if(type === 'medio') camera.position.set(0, 1.4, 2.5);
+        if(type === 'primer') camera.position.set(0, 1.7, 1.2);
+        controls.target.set(0, 1, 0);
+    };
+
+    window.setLightPreset = (type, theory) => {
+        document.getElementById('light-theory').innerText = theory;
+        if(type === 'rembrandt') mainLight.position.set(2, 3, 2);
+        if(type === 'split') mainLight.position.set(4, 1.5, 0);
+        if(type === 'cenital') mainLight.position.set(0, 5, 0);
+    };
+
+    window.updateLightPower = (val) => mainLight.intensity = val;
+    window.updateLightColor = (val) => {
+        mainLight.color.set(val);
+        lightBulb.material.color.set(val);
+    };
 
     function animate() {
         requestAnimationFrame(animate);
-        principal.group.lookAt(0,0,0);
-        relleno.group.lookAt(0,0,0);
-        contra.group.lookAt(0,0,0);
+        lightBulb.position.copy(mainLight.position);
+        controls.update();
         renderer.render(scene, camera);
     }
     animate();
-
-    window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-    });
 </script>
 </body>
 </html>
