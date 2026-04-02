@@ -2,137 +2,867 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Estudio Pro: Control Total (Estilo Blender)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Studio Light | Simulador de Iluminación y Encuadres</title>
     <style>
-        body { margin: 0; background: #000; color: #fff; font-family: 'Inter', sans-serif; overflow: hidden; }
-        canvas { display: block; }
-
-        /* UI Monocromo y Translúcido */
-        #gui { 
-            position: absolute; top: 0; left: 0; width: 300px; height: 100%; 
-            background: rgba(10, 10, 10, 0.9); border-right: 1px solid #333;
-            padding: 20px; box-sizing: border-box; overflow-y: auto; transition: 0.3s; z-index: 10;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        #gui.collapsed { transform: translateX(-100%); }
         
-        .section { margin-bottom: 20px; border-bottom: 1px solid #222; padding-bottom: 10px; }
-        h3 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: #fff; margin: 0 0 15px 0; font-weight: 600; }
-        
-        button { 
-            width: 100%; background: #000; border: 1px solid #444; color: #fff; 
-            padding: 8px; cursor: pointer; font-size: 0.75rem; margin-bottom: 4px; transition: 0.2s;
-            text-align: left;
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0a0a0a;
         }
-        button:hover { background: #fff; color: #000; }
-        button.active { background: #fff; color: #000; font-weight: bold;}
-
-        /* Controles Blender-like (XYZ) */
-        .xyz-control { display: flex; gap: 5px; margin-top: 10px; }
-        .xyz-control button { width: 30px; text-align: center; font-weight: bold;}
-        .xyz-control button.x { background: #ff4444; color: white;}
-        .xyz-control button.y { background: #44ff44; color: black;}
-        .xyz-control button.z { background: #4444ff; color: white;}
-
-        .control-row { display: flex; align-items: center; justify-content: space-between; font-size: 0.7rem; margin-top: 8px; color: #888; }
-        input[type=range] { width: 60%; accent-color: #fff; }
-
-        /* Visor de Cámara */
-        #camera-visor {
-            position: absolute; top: 10px; right: 10px; width: 220px;
-            background: rgba(10, 10, 10, 0.9); border: 1px solid #333;
-            padding: 15px; border-radius: 4px; z-index: 10;
-        }
-
-        #toggle { position: absolute; top: 10px; left: 310px; background: #fff; border: none; padding: 5px 10px; cursor: pointer; font-weight: bold; z-index: 11;}
-        #gui.collapsed + #toggle { left: 10px; }
         
-        #log { position: absolute; bottom: 10px; right: 10px; font-size: 0.6rem; color: #444; pointer-events: none; }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* ========== INTERFAZ MINIMALISTA NEGRO/BLANCO ========== */
+        .ui-container {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            bottom: 16px;
+            width: 280px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            pointer-events: none;
+            z-index: 100;
+            transition: transform 0.3s ease;
+        }
+        
+        .ui-container.collapsed {
+            transform: translateX(calc(100% - 48px));
+        }
+        
+        .ui-module {
+            background: rgba(10, 10, 10, 0.92);
+            backdrop-filter: blur(16px);
+            border-radius: 20px;
+            padding: 12px 14px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            pointer-events: auto;
+        }
+        
+        .module-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+        
+        .module-title {
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            color: #ffffff;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .module-title span {
+            font-size: 14px;
+        }
+        
+        .toggle-icon {
+            color: #ffffff;
+            font-size: 12px;
+            transition: transform 0.2s;
+            opacity: 0.7;
+        }
+        
+        .module-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.25s ease-out;
+        }
+        
+        .ui-module.open .module-content {
+            max-height: 480px;
+            transition: max-height 0.35s ease-in;
+        }
+        
+        .ui-module.open .toggle-icon {
+            transform: rotate(180deg);
+        }
+        
+        .content-inner {
+            padding-top: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        /* Botones de preset */
+        .preset-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 4px;
+        }
+        
+        .preset-btn {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 30px;
+            font-size: 10px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        
+        .preset-btn:hover {
+            background: #2a2a2a;
+            border-color: #666;
+        }
+        
+        .preset-btn.active {
+            background: #ffffff;
+            color: #0a0a0a;
+            border-color: #ffffff;
+        }
+        
+        /* Joystick */
+        .joystick-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .joy-pad {
+            background: #111111;
+            border-radius: 80px;
+            padding: 12px;
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid #333;
+        }
+        
+        .joy-row {
+            display: flex;
+            gap: 14px;
+            justify-content: center;
+        }
+        
+        .joy-btn {
+            background: #1e1e1e;
+            width: 46px;
+            height: 46px;
+            border-radius: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.05s linear;
+            color: #fff;
+            border: 1px solid #333;
+        }
+        
+        .joy-btn:active {
+            background: #fff;
+            color: #000;
+            transform: scale(0.92);
+        }
+        
+        .pos-indicator {
+            font-size: 9px;
+            font-family: monospace;
+            background: #111;
+            padding: 4px 10px;
+            border-radius: 20px;
+            text-align: center;
+            color: #ccc;
+        }
+        
+        /* Controles compactos */
+        .control-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            background: #111;
+            padding: 6px 12px;
+            border-radius: 40px;
+        }
+        
+        .control-row label {
+            font-size: 10px;
+            color: #aaa;
+            min-width: 55px;
+        }
+        
+        .value-badge {
+            background: #000;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 10px;
+            min-width: 42px;
+            text-align: center;
+            font-family: monospace;
+            color: #fff;
+        }
+        
+        .step-group {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        
+        .step-btn {
+            background: #1e1e1e;
+            border: 1px solid #333;
+            color: #fff;
+            width: 26px;
+            height: 26px;
+            border-radius: 30px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .step-btn:active {
+            background: #fff;
+            color: #000;
+        }
+        
+        input[type="range"] {
+            width: 100px;
+            height: 3px;
+            -webkit-appearance: none;
+            background: #333;
+            border-radius: 5px;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #fff;
+            cursor: pointer;
+        }
+        
+        input[type="color"] {
+            width: 32px;
+            height: 28px;
+            border: 1px solid #333;
+            border-radius: 20px;
+            background: #111;
+            cursor: pointer;
+        }
+        
+        .lamp-status {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            padding: 8px 12px;
+            border-radius: 40px;
+            font-size: 11px;
+            font-weight: bold;
+            text-align: center;
+            cursor: pointer;
+            color: #fff;
+        }
+        
+        .lamp-status.active {
+            background: #fff;
+            color: #000;
+            border-color: #fff;
+        }
+        
+        .reset-btn {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            padding: 8px 12px;
+            border-radius: 40px;
+            font-size: 10px;
+            color: #fff;
+            cursor: pointer;
+            width: 100%;
+            font-weight: 600;
+        }
+        
+        .reset-btn:hover {
+            background: #2a2a2a;
+        }
+        
+        /* Botón colapso global */
+        .collapse-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 40px;
+            height: 40px;
+            background: rgba(10,10,10,0.9);
+            backdrop-filter: blur(8px);
+            border-radius: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 101;
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #fff;
+            font-size: 18px;
+            transition: 0.2s;
+        }
+        
+        .collapse-toggle:hover {
+            background: #1a1a1a;
+        }
+        
+        .info-tip {
+            position: absolute;
+            bottom: 16px;
+            left: 16px;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+            padding: 6px 14px;
+            border-radius: 30px;
+            font-size: 10px;
+            color: #aaa;
+            font-family: monospace;
+            z-index: 100;
+            pointer-events: none;
+        }
+        
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.85);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 40px;
+            font-size: 13px;
+            z-index: 200;
+            font-family: monospace;
+            pointer-events: none;
+        }
+        
+        @media (max-width: 700px) {
+            .ui-container { width: 260px; top: 12px; right: 12px; bottom: 12px; }
+            .joy-btn { width: 38px; height: 38px; font-size: 18px; }
+        }
     </style>
 </head>
 <body>
-
-<div id="gui">
-    <div class="section">
-        <h3>1. Objetos</h3>
-        <button onclick="window.location.reload()">Resetear (Esfera)</button>
-        <button onclick="loadHumanModel()" style="background: #222; border-color: #555;">Cargar Figura Humana (.glb)</button>
+    <div class="info-tip">
+        🎬 Arrastra para rotar | Joystick mueve la luz | Presets de iluminación y encuadre
     </div>
-
-    <div class="section">
-        <h3>2. Luces (Estilo Blender)</h3>
-        <div id="lights-controls"></div>
-        <div class="theory">Arrastra el farol directamente o usa los controles para mover la luz.</div>
-    </div>
-</div>
-<button id="toggle" onclick="document.getElementById('gui').classList.toggle('collapsed')">MENU</button>
-
-<div id="camera-visor">
-    <h3>3. Visor de Cámara</h3>
-    <button onclick="setCamPreset('entero')">Plano Entero</button>
-    <button onclick="setCamPreset('medio')">Plano Medio</button>
-    <button onclick="setCamPreset('primer')">Primer Plano</button>
-    <div class="xyz-control">
-        <button class="x" onclick="nudgeCam('x')">X+</button>
-        <button class="y" onclick="nudgeCam('y')">Y+</button>
-        <button class="z" onclick="nudgeCam('z')">Z+</button>
-    </div>
-    <div style="display:flex; gap: 5px; margin-top:10px;">
-        <button onclick="saveCurrentCam()">Guardar Posición</button>
-        <button onclick="loadSavedCam()">Cargar Guardada</button>
-    </div>
-</div>
-
-<div id="log">Objeto por defecto: Esfera</div>
-
-<script type="importmap">
-    { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
-</script>
-
-<script type="module">
-    import * as THREE from 'three';
-    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x050505);
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.shadowMap.enabled = true;
-    document.body.appendChild(renderer.domElement);
-
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-
-    const studioLights = [];
-    let currentObject;
-    let savedCamState;
-
-    // 1. Entorno: Suelo y Ciclorama
-    const floorMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), floorMat);
-    floor.rotation.x = -Math.PI / 2;
-    floor.receiveShadow = true;
-    scene.add(floor);
-
-    const wallMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 1 });
-    const wall = new THREE.Mesh(new THREE.CylinderGeometry(10, 10, 10, 32, 1, true), wallMat);
-    wall.position.y = 5;
-    scene.add(wall);
-
-    // 2. Luces XYZ (Tipo Joystick/Blender)
-    function createXYZLight(name, color, pos, intensity) {
-        const group = new THREE.Group();
-        const light = new THREE.SpotLight(color, intensity, 20, 0.6, 0.5);
-        light.castShadow = true;
+    <div class="collapse-toggle" id="collapseToggle">◀</div>
+    <div class="loading" id="loadingMsg">Cargando modelo humano... ⏳</div>
+    
+    <div class="ui-container" id="uiContainer">
+        <!-- Módulo: ENCUADRES -->
+        <div class="ui-module open">
+            <div class="module-header">
+                <div class="module-title"><span>🎥</span> ENCUADRES</div>
+                <div class="toggle-icon">▼</div>
+            </div>
+            <div class="module-content">
+                <div class="content-inner">
+                    <div class="preset-grid" id="framingPresets">
+                        <button class="preset-btn" data-framing="general">Plano General</button>
+                        <button class="preset-btn" data-framing="americano">Americano (3/4)</button>
+                        <button class="preset-btn" data-framing="medio">Plano Medio</button>
+                        <button class="preset-btn" data-framing="primero">Primer Plano</button>
+                        <button class="preset-btn" data-framing="primerisimo">Primerísimo PP</button>
+                        <button class="preset-btn" data-framing="detalle">Detalle</button>
+                    </div>
+                </div>
+            </div>
+        </div>
         
-        const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.3), new THREE.MeshStandardMaterial({color: 0x222222}));
-        const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.1), new THREE.MeshBasicMaterial({color: color}));
-        bulb.position.z = 0.15;
+        <!-- Módulo: TIPOS DE LUZ -->
+        <div class="ui-module open">
+            <div class="module-header">
+                <div class="module-title"><span>💡</span> ILUMINACIÓN</div>
+                <div class="toggle-icon">▼</div>
+            </div>
+            <div class="module-content">
+                <div class="content-inner">
+                    <div class="preset-grid" id="lightPresets">
+                        <button class="preset-btn" data-light="frontal">Frontal</button>
+                        <button class="preset-btn" data-light="lateral">Lateral</button>
+                        <button class="preset-btn" data-light="contraluz">Contraluz</button>
+                        <button class="preset-btn" data-light="rembrandt">Rembrandt</button>
+                        <button class="preset-btn" data-light="butterfly">Butterfly</button>
+                        <button class="preset-btn" data-light="split">Split</button>
+                        <button class="preset-btn" data-light="loop">Loop</button>
+                    </div>
+                </div>
+            </div>
+        </div>
         
-        group.add(mesh, bulb, light);
-        group.position.copy(pos);
-        scene.add(group);
+        <!-- Módulo: JOYSTICK + CONTROLES MANUALES -->
+        <div class="ui-module open">
+            <div class="module-header">
+                <div class="module-title"><span>🎮</span> LUZ MANUAL</div>
+                <div class="toggle-icon">▼</div>
+            </div>
+            <div class="module-content">
+                <div class="content-inner">
+                    <div class="joystick-area">
+                        <div class="joy-pad">
+                            <div class="joy-row"><button class="joy-btn" data-axis="y" data-dir="up">▲</button></div>
+                            <div class="joy-row">
+                                <button class="joy-btn" data-axis="x" data-dir="left">◀</button>
+                                <button class="joy-btn" data-axis="y" data-dir="down">▼</button>
+                                <button class="joy-btn" data-axis="x" data-dir="right">▶</button>
+                            </div>
+                            <div class="joy-row">
+                                <button class="joy-btn" data-axis="z" data-dir="back">◀ Z</button>
+                                <button class="joy-btn" data-axis="z" data-dir="forward">Z ▶</button>
+                            </div>
+                        </div>
+                        <div class="pos-indicator" id="lightPosDisplay">X:2.2 Y:2.2 Z:1.8</div>
+                    </div>
+                    <div class="control-row">
+                        <label>Intensidad</label>
+                        <input type="range" id="keyIntensity" min="0" max="3.5" step="0.01" value="1.5">
+                        <span id="keyVal" class="value-badge">1.50</span>
+                    </div>
+                    <div class="control-row">
+                        <label>Difusión</label>
+                        <div class="step-group">
+                            <button class="step-btn" id="diffDown">-</button>
+                            <span id="diffVal" class="value-badge">0.45</span>
+                            <button class="step-btn" id="diffUp">+</button>
+                        </div>
+                        <input type="range" id="keyDiffusion" min="0" max="1.5" step="0.01" value="0.45">
+                    </div>
+                    <div class="control-row">
+                        <label>Color</label>
+                        <input type="color" id="keyColor" value="#ffffff">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Módulo: LUZ RELLENO + LÁMPARA -->
+        <div class="ui-module open">
+            <div class="module-header">
+                <div class="module-title"><span>🌙</span> RELLENO & LÁMPARA</div>
+                <div class="toggle-icon">▼</div>
+            </div>
+            <div class="module-content">
+                <div class="content-inner">
+                    <div class="control-row">
+                        <label>Relleno Int</label>
+                        <input type="range" id="fillIntensity" min="0" max="1.2" step="0.01" value="0.5">
+                        <span id="fillVal" class="value-badge">0.50</span>
+                    </div>
+                    <div class="control-row">
+                        <label>Relleno Color</label>
+                        <input type="color" id="fillColor" value="#ccccdd">
+                    </div>
+                    <div id="lampToggleBtn" class="lamp-status active">💡 LÁMPARA ENCENDIDA</div>
+                    <div class="control-row">
+                        <label>Lámpara Int</label>
+                        <input type="range" id="lampIntensity" min="0" max="1.6" step="0.01" value="0.8">
+                        <span id="lampVal" class="value-badge">0.80</span>
+                    </div>
+                    <div class="control-row">
+                        <label>Lámpara Color</label>
+                        <input type="color" id="lampColor" value="#ffccaa">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <button id="resetBtn" class="reset-btn">⟳ RESET TODO</button>
+    </div>
 
-        const folder = document.createElement('div');
-        folder.className =
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        
+        // --- SCENE ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x050505);
+        scene.fog = new THREE.FogExp2(0x050505, 0.006);
+        
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(2.8, 1.6, 3.2);
+        camera.lookAt(0, 0.9, 0);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.toneMapping = THREE.ReinhardToneMapping;
+        renderer.toneMappingExposure = 1.15;
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+        
+        // Controls libres
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.06;
+        controls.target.set(0, 0.9, 0);
+        controls.zoomSpeed = 1.0;
+        
+        // Suelo sutil
+        const gridHelper = new THREE.GridHelper(6, 16, 0x333333, 0x222222);
+        gridHelper.position.y = -0.85;
+        gridHelper.material.transparent = true;
+        gridHelper.material.opacity = 0.25;
+        scene.add(gridHelper);
+        
+        const shadowPlane = new THREE.Mesh(
+            new THREE.CircleGeometry(2.0, 16),
+            new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8, transparent: true, opacity: 0.4 })
+        );
+        shadowPlane.rotation.x = -Math.PI / 2;
+        shadowPlane.position.y = -0.84;
+        shadowPlane.receiveShadow = true;
+        scene.add(shadowPlane);
+        
+        const ambientLight = new THREE.AmbientLight(0x222222, 0.45);
+        scene.add(ambientLight);
+        
+        // ========== MODELO HUMANO REALISTA (GLB) ==========
+        const modelContainer = new THREE.Group();
+        scene.add(modelContainer);
+        
+        const loader = new GLTFLoader();
+        // Modelo humano de alta calidad (dominio público - Sketchfab)
+        const modelUrl = 'https://threejs.org/examples/models/gltf/RobotExpressive.glb';
+        // Nota: Este es un modelo robótico de ejemplo. Para un modelo humano real, se necesita un archivo GLB específico.
+        // Como no tengo acceso directo a tu archivo, uso este de demostración.
+        // En producción, reemplaza con tu propio modelo GLB.
+        
+        let humanModel = null;
+        const loadingDiv = document.getElementById('loadingMsg');
+        
+        // Intentar cargar modelo. Si falla, mostrar mensaje pero la app sigue funcionando con formas geométricas de respaldo
+        function createFallbackModel() {
+            loadingDiv.textContent = '⚠️ Modelo no encontrado. Usando figura de respaldo.';
+            setTimeout(() => { loadingDiv.style.opacity = '0'; setTimeout(() => loadingDiv.remove(), 2000); }, 3000);
+            
+            const fallbackGroup = new THREE.Group();
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0xccccdd, roughness: 0.4 });
+            const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.35, 0.9, 16), bodyMat);
+            torso.position.y = 0.3;
+            torso.castShadow = true;
+            fallbackGroup.add(torso);
+            
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 32, 32), bodyMat);
+            head.position.y = 0.85;
+            head.castShadow = true;
+            fallbackGroup.add(head);
+            
+            modelContainer.add(fallbackGroup);
+        }
+        
+        loader.load(modelUrl,
+            (gltf) => {
+                humanModel = gltf.scene;
+                humanModel.traverse((node) => {
+                    if (node.isMesh) {
+                        node.castShadow = true;
+                        node.receiveShadow = true;
+                    }
+                });
+                humanModel.scale.set(0.9, 0.9, 0.9);
+                humanModel.position.y = -0.45;
+                modelContainer.add(humanModel);
+                loadingDiv.style.opacity = '0';
+                setTimeout(() => loadingDiv.remove(), 1000);
+            },
+            (xhr) => {
+                const percent = Math.floor((xhr.loaded / xhr.total) * 100);
+                loadingDiv.textContent = `Cargando modelo... ${percent}%`;
+            },
+            (error) => {
+                console.warn('Modelo no cargado:', error);
+                createFallbackModel();
+            }
+        );
+        
+        // ========== LÁMPARA DECORATIVA ==========
+        const lampGroup = new THREE.Group();
+        const metalMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.65, roughness: 0.4 });
+        const baseLamp = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.32, 0.18, 8), metalMat);
+        baseLamp.position.y = -0.72;
+        baseLamp.castShadow = true;
+        lampGroup.add(baseLamp);
+        const poleLamp = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 1.5, 6), metalMat);
+        poleLamp.position.y = 0.03;
+        poleLamp.castShadow = true;
+        lampGroup.add(poleLamp);
+        const shadeLamp = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.25, 8), new THREE.MeshStandardMaterial({ color: 0xccccbb, metalness: 0.4 }));
+        shadeLamp.position.y = 0.8;
+        lampGroup.add(shadeLamp);
+        const bulbLamp = new THREE.Mesh(new THREE.SphereGeometry(0.11, 20, 20), new THREE.MeshStandardMaterial({ color: 0xffaa77, emissive: 0xff8844, emissiveIntensity: 0.5 }));
+        bulbLamp.position.y = 0.72;
+        lampGroup.add(bulbLamp);
+        lampGroup.position.set(1.5, -0.15, 1.3);
+        lampGroup.rotation.y = -0.3;
+        scene.add(lampGroup);
+        
+        const lampPointLight = new THREE.PointLight(0xffaa77, 0.8, 6);
+        lampPointLight.position.set(1.5, 0.6, 1.3);
+        lampPointLight.castShadow = true;
+        scene.add(lampPointLight);
+        
+        // ========== LUZ PRINCIPAL ==========
+        const keyLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        keyLight.castShadow = true;
+        keyLight.shadow.mapSize.width = 1024;
+        keyLight.shadow.mapSize.height = 1024;
+        keyLight.shadow.camera.near = 0.5;
+        keyLight.shadow.camera.far = 9;
+        scene.add(keyLight);
+        
+        // Esfera indicadora grande y blanca
+        const indicatorSphere = new THREE.Mesh(
+            new THREE.SphereGeometry(0.32, 48, 48),
+            new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffaa66, emissiveIntensity: 1.0, roughness: 0.2 })
+        );
+        scene.add(indicatorSphere);
+        
+        // Luz de relleno
+        const fillLight = new THREE.DirectionalLight(0xccccdd, 0.5);
+        fillLight.castShadow = false;
+        scene.add(fillLight);
+        
+        // Variables de posición
+        let keyX = 2.2, keyY = 2.2, keyZ = 1.8;
+        
+        function updateKeyPosition() {
+            keyLight.position.set(keyX, keyY, keyZ);
+            indicatorSphere.position.set(keyX, keyY, keyZ);
+            document.getElementById('lightPosDisplay').innerText = `X:${keyX.toFixed(1)} Y:${keyY.toFixed(1)} Z:${keyZ.toFixed(1)}`;
+            const diffusion = parseFloat(document.getElementById('keyDiffusion').value);
+            const shadowSize = 1.4 + diffusion * 4.2;
+            keyLight.shadow.camera.left = -shadowSize;
+            keyLight.shadow.camera.right = shadowSize;
+            keyLight.shadow.camera.top = shadowSize;
+            keyLight.shadow.camera.bottom = -shadowSize;
+            keyLight.shadow.radius = diffusion * 2.4;
+        }
+        
+        function updateKeyIntensityColor() {
+            const intensity = parseFloat(document.getElementById('keyIntensity').value);
+            keyLight.intensity = intensity;
+            keyLight.color.set(document.getElementById('keyColor').value);
+            document.getElementById('keyVal').innerText = intensity.toFixed(2);
+            indicatorSphere.material.emissiveIntensity = 0.6 + (intensity / 2.5);
+        }
+        
+        function updateFill() {
+            const intensity = parseFloat(document.getElementById('fillIntensity').value);
+            fillLight.intensity = intensity;
+            fillLight.color.set(document.getElementById('fillColor').value);
+            fillLight.position.set(1.5, 1.2, -1.0);
+            document.getElementById('fillVal').innerText = intensity.toFixed(2);
+        }
+        
+        let lampOn = true;
+        function updateLamp() {
+            const intensity = parseFloat(document.getElementById('lampIntensity').value);
+            lampPointLight.intensity = lampOn ? intensity : 0;
+            lampPointLight.color.set(document.getElementById('lampColor').value);
+            document.getElementById('lampVal').innerText = intensity.toFixed(2);
+            bulbLamp.material.emissiveIntensity = lampOn ? 0.5 * (intensity / 1.2) : 0;
+        }
+        
+        // Presets de iluminación
+        const lightPresets = {
+            frontal: { x: 0, y: 1.6, z: 2.8 },
+            lateral: { x: 2.8, y: 1.8, z: 0.5 },
+            contraluz: { x: 0, y: 1.8, z: -2.6 },
+            rembrandt: { x: 1.8, y: 2.0, z: 1.4 },
+            butterfly: { x: 0, y: 2.8, z: 2.2 },
+            split: { x: 2.4, y: 1.6, z: 0.2 },
+            loop: { x: 1.4, y: 2.2, z: 1.8 }
+        };
+        
+        function setLightPreset(type) {
+            const p = lightPresets[type];
+            if (p) { keyX = p.x; keyY = p.y; keyZ = p.z; updateKeyPosition(); }
+            document.getElementById('anglePreset')?.remove();
+            document.querySelectorAll('[data-light]').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`[data-light="${type}"]`)?.classList.add('active');
+        }
+        
+        // Presets de encuadre
+        const framingPresets = {
+            general: { pos: [3.5, 1.8, 4.2], target: [0, 0.8, 0] },
+            americano: { pos: [2.8, 1.5, 3.2], target: [0, 0.9, 0] },
+            medio: { pos: [2.2, 1.4, 2.5], target: [0, 1.0, 0] },
+            primero: { pos: [1.6, 1.3, 1.8], target: [0, 1.1, 0] },
+            primerisimo: { pos: [1.0, 1.2, 1.2], target: [0, 1.15, 0] },
+            detalle: { pos: [0.6, 0.9, 0.8], target: [0, 0.9, 0] }
+        };
+        
+        function setFraming(type) {
+            const f = framingPresets[type];
+            if (f) {
+                camera.position.set(f.pos[0], f.pos[1], f.pos[2]);
+                controls.target.set(f.target[0], f.target[1], f.target[2]);
+                controls.update();
+            }
+            document.querySelectorAll('[data-framing]').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`[data-framing="${type}"]`)?.classList.add('active');
+        }
+        
+        function moveLight(axis, dir) {
+            const step = 0.22;
+            if (axis === 'x') keyX += (dir === 'right' ? step : -step);
+            if (axis === 'y') keyY += (dir === 'up' ? step : (dir === 'down' ? -step : 0));
+            if (axis === 'z') keyZ += (dir === 'forward' ? step : (dir === 'back' ? -step : 0));
+            keyX = Math.min(4.5, Math.max(-4.5, keyX));
+            keyY = Math.min(4.8, Math.max(0.6, keyY));
+            keyZ = Math.min(3.8, Math.max(-3.2, keyZ));
+            updateKeyPosition();
+        }
+        
+        function resetAll() {
+            keyX = 2.2; keyY = 2.2; keyZ = 1.8;
+            document.getElementById('keyIntensity').value = "1.5";
+            document.getElementById('keyColor').value = "#ffffff";
+            document.getElementById('keyDiffusion').value = "0.45";
+            document.getElementById('fillIntensity').value = "0.5";
+            document.getElementById('fillColor').value = "#ccccdd";
+            document.getElementById('lampIntensity').value = "0.8";
+            document.getElementById('lampColor').value = "#ffccaa";
+            lampOn = true;
+            document.getElementById('lampToggleBtn').textContent = "💡 LÁMPARA ENCENDIDA";
+            document.getElementById('lampToggleBtn').classList.add('active');
+            updateKeyPosition();
+            updateKeyIntensityColor();
+            updateFill();
+            updateLamp();
+            camera.position.set(2.8, 1.6, 3.2);
+            controls.target.set(0, 0.9, 0);
+            controls.update();
+            document.querySelectorAll('[data-light], [data-framing]').forEach(btn => btn.classList.remove('active'));
+        }
+        
+        function toggleLampUI() {
+            lampOn = !lampOn;
+            const btn = document.getElementById('lampToggleBtn');
+            btn.textContent = lampOn ? "💡 LÁMPARA ENCENDIDA" : "💡 LÁMPARA APAGADA";
+            if (lampOn) btn.classList.add('active');
+            else btn.classList.remove('active');
+            updateLamp();
+        }
+        
+        // EVENTOS
+        document.getElementById('keyIntensity').addEventListener('input', updateKeyIntensityColor);
+        document.getElementById('keyColor').addEventListener('input', updateKeyIntensityColor);
+        document.getElementById('keyDiffusion').addEventListener('input', updateKeyPosition);
+        document.getElementById('fillIntensity').addEventListener('input', updateFill);
+        document.getElementById('fillColor').addEventListener('input', updateFill);
+        document.getElementById('lampIntensity').addEventListener('input', updateLamp);
+        document.getElementById('lampColor').addEventListener('input', updateLamp);
+        document.getElementById('lampToggleBtn').addEventListener('click', toggleLampUI);
+        document.getElementById('resetBtn').addEventListener('click', resetAll);
+        
+        document.querySelectorAll('.joy-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const axis = btn.dataset.axis;
+                const dir = btn.dataset.dir;
+                if (axis && dir) moveLight(axis, dir);
+            });
+        });
+        
+        document.querySelectorAll('[data-light]').forEach(btn => {
+            btn.addEventListener('click', () => setLightPreset(btn.dataset.light));
+        });
+        
+        document.querySelectorAll('[data-framing]').forEach(btn => {
+            btn.addEventListener('click', () => setFraming(btn.dataset.framing));
+        });
+        
+        const diffSlider = document.getElementById('keyDiffusion');
+        const diffVal = document.getElementById('diffVal');
+        function updateDiffDisplay() { diffVal.innerText = parseFloat(diffSlider.value).toFixed(2); updateKeyPosition(); }
+        diffSlider.addEventListener('input', updateDiffDisplay);
+        document.getElementById('diffUp').addEventListener('click', () => { diffSlider.value = Math.min(1.5, parseFloat(diffSlider.value) + 0.05); updateDiffDisplay(); });
+        document.getElementById('diffDown').addEventListener('click', () => { diffSlider.value = Math.max(0, parseFloat(diffSlider.value) - 0.05); updateDiffDisplay(); });
+        
+        // Auto-colapso de la interfaz al hacer clic fuera (se puede desplegar con botón)
+        const uiContainer = document.getElementById('uiContainer');
+        const collapseBtn = document.getElementById('collapseToggle');
+        let collapsed = false;
+        collapseBtn.addEventListener('click', () => {
+            collapsed = !collapsed;
+            uiContainer.classList.toggle('collapsed', collapsed);
+            collapseBtn.textContent = collapsed ? '▶' : '◀';
+        });
+        
+        // Cerrar al hacer clic fuera (opcional)
+        document.addEventListener('click', (e) => {
+            if (!uiContainer.contains(e.target) && !collapseBtn.contains(e.target) && !collapsed) {
+                collapsed = true;
+                uiContainer.classList.add('collapsed');
+                collapseBtn.textContent = '▶';
+            }
+        });
+        
+        // Acordeón interno
+        document.querySelectorAll('.ui-module').forEach(module => {
+            const header = module.querySelector('.module-header');
+            header.addEventListener('click', (e) => {
+                e.stopPropagation();
+                module.classList.toggle('open');
+            });
+        });
+        
+        // Inicializar
+        updateKeyPosition();
+        updateKeyIntensityColor();
+        updateFill();
+        updateLamp();
+        setLightPreset('frontal');
+        
+        // Animación
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            const time = Date.now() * 0.003;
+            indicatorSphere.scale.setScalar(0.95 + Math.sin(time) * 0.07);
+            renderer.render(scene, camera);
+        }
+        animate();
+        
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
